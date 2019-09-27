@@ -20,6 +20,7 @@
 #include <unistd.h>
 #include <sys/types.h>
 #include <sys/wait.h>
+#include <signal.h>
 
 #include "types.h"
 #include "parser.h"
@@ -51,8 +52,20 @@ static void set_timeout(unsigned int timeout)
 }
 /*          ****** DO NOT MODIFY ANYTHING UP TO THIS LINE ******      */
 /*====================================================================*/
+char name[1024];
+char* childname = name;
+pid_t pid;
+int status;
+bool timer_set = false;
 
+struct sigaction act;
+struct sigaction old;
+void timeout_handler(){
+	kill(pid,SIGKILL);
+	fprintf(stderr, "%s is timed out\n",childname); // 죽은 자식 출력
+	memset(name,0,1024); // 자식이름 담은 배열 초기화
 
+}
 /***********************************************************************
  * run_command()
  *
@@ -67,8 +80,11 @@ static void set_timeout(unsigned int timeout)
  */
 static int run_command(int nr_tokens, char *tokens[])
 {
-	int status;
-
+	act.sa_handler = timeout_handler;
+	act.sa_flags = 0;
+    sigemptyset(&act.sa_mask);
+    sigaction(SIGALRM,&act,0);
+	
 	if (strncmp(tokens[0], "exit", strlen("exit")) == 0) {
 		return 0; // 종료 명령 - exit
 	}else if(strncmp(tokens[0],"cd",strlen("cd"))==0){
@@ -107,8 +123,8 @@ static int run_command(int nr_tokens, char *tokens[])
 		for 명령어 실행 코드
 			algorithm ->
 			1. for로 시작하는 명령임을 인식한다.
-			2. 숫자가 나오는 것을 계속 곱한다.(중첩 루프))
-			3. 숫자도 for도 아닌 문자가 나오는 것을 인식하고, command 배열에 이것을 담아둔다.
+			2. 숫자가 나오는 것을 계속 곱한다.(중첩 루프)
+			3. 숫자도 for도 아닌 문자열이 나오는 것을 인식하고, command 배열에 이것을 담아둔다.
 			4. cd 혹은 기타 명령어 일 것이므로 그에 맞게 실행시켜 준다.
 		*/
 		int loop = 1; // loop counter
@@ -126,12 +142,12 @@ static int run_command(int nr_tokens, char *tokens[])
 			}
 			index++; // 인덱스 증가
 		}
+		
 		while(loop--){ // 이제 반복시킨다.
 			if(strncmp(command[0],"cd",strlen("cd"))==0){ // cd 일 때,
 				char buffer[1024];
 				char * p = buffer;
 				if(strncmp(command[1],"~",strlen("~"))==0){
-					p = getenv("HOME");
 					if(chdir(p)==-1){
 					fprintf(stderr, "No such file or directory\n");
 					}
@@ -142,7 +158,6 @@ static int run_command(int nr_tokens, char *tokens[])
 				}
 			}else{ // cd 제외 명령어 일 때,
 				if ( fork() == 0 ){
-        			execvp(command[0],command);
 					if(execvp(command[0],command)<0){
 						fprintf(stderr, "No such file or directory\n");
 					}
@@ -155,8 +170,23 @@ static int run_command(int nr_tokens, char *tokens[])
 		memset(command,0,1024); // command 배열 초기화
 		//printf("%d\n",loop);
 		//printf("%s\n",command);
+	}else if(strncmp(tokens[0],"timeout",strlen("timeout"))==0){
+		/* information - 
+		timeout 명령어
+		*/
+		if(tokens[1] == NULL){
+			fprintf(stderr,"Current timeout is 0 second\n");
+		}else{
+			set_timeout(atoi(tokens[1])); // 타이머 맞추기
+			if(atoi(tokens[1])){ // 시간이 0이 아니면..
+				// fprintf(stderr,"타이머 설정\n");
+				timer_set = true; // 타이머 동작
+			}else{
+				timer_set = false; // 0이면 타이머 해제
+			}
+		}
 	}else{
-		if ( fork() == 0 ){
+		if ( (pid=fork()) == 0 ){
 			/* information -
 			fork함수를 이용하여 자식프로세스 생성시켰다.
 			자식은 쉘일 필요가 없고 사용자의 명령어를 실행,
@@ -166,7 +196,6 @@ static int run_command(int nr_tokens, char *tokens[])
 			man execvp 참조..
 			execvp(파일/명령어,argv);
 			*/
-        	execvp(tokens[0],tokens);
 			if(execvp(tokens[0],tokens)<0){
 				fprintf(stderr, "No such file or directory\n");
 			}
@@ -181,7 +210,12 @@ static int run_command(int nr_tokens, char *tokens[])
 			자식이 여러개인 경우는 waitpid함수를 사용하는 것이 좋다
 			왜냐하면 wait함수는 누가 죽엇는지 모른다.
 			*/
-        	wait( &status );
+			childname = tokens[0];
+			if(timer_set){
+				alarm(__timeout);
+			}
+        	wait(&status); // 자식 종료 전까지는 안끝나니까 이게 끝나서 밑줄로 내려갓다는 의미는 자식이 종료됫음을 의미
+			alarm(0); // 자식이 먼저 종료됫으므로 알람 취소
 		}
 	}
 	return 1;
