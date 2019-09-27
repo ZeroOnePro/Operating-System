@@ -52,6 +52,13 @@ static void set_timeout(unsigned int timeout)
 }
 /*          ****** DO NOT MODIFY ANYTHING UP TO THIS LINE ******      */
 /*====================================================================*/
+
+/***********************************************************************
+ * timeout_handler()
+ *
+ * DESCRIPTION
+ * 	when receive alarm signal, kill child process
+ */
 char name[1024];
 char* childname = name;
 pid_t pid;
@@ -59,13 +66,14 @@ int status;
 bool timer_set = false;
 
 struct sigaction act;
-struct sigaction old;
+
 void timeout_handler(){
-	kill(pid,SIGKILL);
+	kill(pid,SIGKILL); // 자식 죽이기
 	fprintf(stderr, "%s is timed out\n",childname); // 죽은 자식 출력
 	memset(name,0,1024); // 자식이름 담은 배열 초기화
 
 }
+
 /***********************************************************************
  * run_command()
  *
@@ -86,12 +94,21 @@ static int run_command(int nr_tokens, char *tokens[])
     sigaction(SIGALRM,&act,0);
 	
 	if (strncmp(tokens[0], "exit", strlen("exit")) == 0) {
-		return 0; // 종료 명령 - exit
+		/* information -
+			종료 명령
+		*/
+		return 0;
+	}else if(strncmp(tokens[0], "prompt", strlen("prompt")) == 0){
+		/* informaion -
+			프롬프트
+			static char __prompt[MAX_TOKEN_LEN] = "$"; -> original
+		*/
+		strcpy(__prompt,tokens[1]);
 	}else if(strncmp(tokens[0],"cd",strlen("cd"))==0){
 		/* information -
-		   cd 명령은 fork - exec로 하면 
-		   자식프로세스가 이동하고 끝나기
-		   때문에 따로 구현해줘야 한다.
+			cd 명령은 fork - exec로 하면 
+		   	자식프로세스가 이동하고 끝나기
+		   	때문에 따로 구현해줘야 한다.
 		*/
 		char buffer[1024];
 		char * p = buffer;
