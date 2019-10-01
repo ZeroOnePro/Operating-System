@@ -177,10 +177,11 @@ static int run_command(int nr_tokens, char *tokens[])
 				if ( (pid=fork()) == 0 ){
 					if(execvp(command[0],command)<0){
 						fprintf(stderr, "No such file or directory\n");
+						kill(getpid(),SIGKILL);
 					}
 					exit(0);
 				}else{
-        			waitpid(pid,&status,0);
+        			waitpid(pid,&status,2);
 				}
 			}
 		}
