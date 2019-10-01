@@ -21,7 +21,7 @@
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <signal.h>
-
+#include <assert.h>
 #include "types.h"
 #include "parser.h"
 
@@ -69,7 +69,7 @@ struct sigaction act;
 
 void timeout_handler(){
 	kill(pid,SIGKILL); // 자식 죽이기
-	fprintf(stderr, "%s is timed out\n",childname); // 죽은 자식 출력
+	fprintf(stderr,"%s is timed out\n",childname); // 죽은 자식 출력
 	memset(name,0,1024); // 자식이름 담은 배열 초기화
 
 }
@@ -92,7 +92,7 @@ static int run_command(int nr_tokens, char *tokens[])
 	act.sa_flags = 0;
     sigemptyset(&act.sa_mask);
     sigaction(SIGALRM,&act,0);
-	
+
 	if (strncmp(tokens[0], "exit", strlen("exit")) == 0) {
 		/* information -
 			종료 명령
@@ -174,13 +174,13 @@ static int run_command(int nr_tokens, char *tokens[])
 					}
 				}
 			}else{ // cd 제외 명령어 일 때,
-				if ( fork() == 0 ){
+				if ( (pid=fork()) == 0 ){
 					if(execvp(command[0],command)<0){
 						fprintf(stderr, "No such file or directory\n");
 					}
-					exit(-1);
+					exit(0);
 				}else{
-        			wait( &status );
+        			waitpid(pid,&status,0);
 				}
 			}
 		}
@@ -215,8 +215,9 @@ static int run_command(int nr_tokens, char *tokens[])
 			*/
 			if(execvp(tokens[0],tokens)<0){
 				fprintf(stderr, "No such file or directory\n");
+				kill(getpid(),SIGKILL); // 비정상 종료시 exit문으로 가지 않기때문에 종료되지 않는다 비정상종료시켜야된다.
 			}
-			exit(-1);
+			exit(0);
 		}else{
 			/* information -
 			부모는 자식이 끝나기를 기다린다.
@@ -231,7 +232,9 @@ static int run_command(int nr_tokens, char *tokens[])
 			if(timer_set){
 				alarm(__timeout);
 			}
-        	wait(&status); // 자식 종료 전까지는 안끝나니까 이게 끝나서 밑줄로 내려갓다는 의미는 자식이 종료됫음을 의미
+			
+        	waitpid(pid,&status,2); // 자식 종료 전까지는 안끝나니까 이게 끝나서 밑줄로 내려갓다는 의미는 자식이 종료됫음을 의미
+			
 			alarm(0); // 자식이 먼저 종료됫으므로 알람 취소
 		}
 	}
