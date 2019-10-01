@@ -216,6 +216,8 @@ static int run_command(int nr_tokens, char *tokens[])
 			if(execvp(tokens[0],tokens)<0){
 				fprintf(stderr, "No such file or directory\n");
 				kill(getpid(),SIGKILL); // 비정상 종료시 exit문으로 가지 않기때문에 종료되지 않는다 비정상종료시켜야된다.
+				// abort(); ->  이것도 가능
+				// assert(0); -> 이것도 가능
 			}
 			exit(0);
 		}else{
