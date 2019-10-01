@@ -34,7 +34,7 @@ test-cd: $(TARGET) testcases/test-cd
 
 .PHONY: test-for
 test-for: $(TARGET) testcases/test-for
-	./$< -q < testcases/test-cd
+	./$< -q < testcases/test-for
 
 .PHONY: test-prompt
 test-prompt: $(TARGET) testcases/test-prompt
