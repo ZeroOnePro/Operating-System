@@ -44,6 +44,10 @@ static void set_timeout(unsigned int timeout)
 	}
 }
 
+void timeout_handler(){
+    
+}
+
 int main(int argc, const char* argv[]){
     int status;
     struct sigaction act;
@@ -51,7 +55,6 @@ int main(int argc, const char* argv[]){
     sigemptyset(&act.sa_mask);
     act.sa_flags = 0;
     sigaction(SIGALRM,&act,0);
-    alarm(2);
     pid_t pid;
     if((pid=fork())==0){
         sleep(20);
@@ -62,7 +65,6 @@ int main(int argc, const char* argv[]){
             wait(&status);
         }else{
             alarm(atoi(argv[1]));
-            wait(&status);
             fprintf(stderr, "%s is timed out\n", "child");
             kill(pid,SIGKILL);
         }
