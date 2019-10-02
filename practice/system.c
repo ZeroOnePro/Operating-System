@@ -29,6 +29,7 @@ int main(int argc, const char* argv[]){
 }
 */
 
+/* os project1 practice
 static unsigned int __timeout = 2;
 
 static void set_timeout(unsigned int timeout)
@@ -69,6 +70,26 @@ int main(int argc, const char* argv[]){
             kill(pid,SIGKILL);
         }
     }
+
+    return 0;
+}
+*/
+
+int main(int argc, char* argv[]){
+    
+    int status;
+    pid_t pid;
+
+    if((pid=fork())==0){
+        if(execvp(argv[0],argv)<0){
+            fprintf(stderr,"No such file of directory\n");
+            abort();
+        }
+    }else{
+        waitpid(pid,&status,0);
+    }
+
+    fprintf(stderr,"부모새끼\n");
 
     return 0;
 }
