@@ -216,6 +216,12 @@ static int run_command(int nr_tokens, char *tokens[])
 			*/
 			if(execvp(tokens[0],tokens)<0){
 				fclose(stdin);
+				/*
+				exit()가 stdin의 입력을 flush하기 때문에 부모로 밀어넣는다
+				그 때문에 main()에 열려있는 fgets함수를 잠시 fclose()로 닫고
+				exit를 쓰면 입력의 뒤섞임 없이 종료 된다.
+				*/
+				//fprintf(stderr,"i am child : %d\n",getpid());
 				fprintf(stderr, "No such file or directory\n");
 				exit(-1);
 				//kill(getpid(),SIGKILL); // 비정상 종료시 exit문으로 가지 않기때문에 종료되지 않는다 비정상종료시켜야된다.
@@ -303,7 +309,7 @@ int main(int argc, char * const argv[])
 			break;
 		}
 	}
-
+	
 	if ((ret = initialize(argc, argv))) return EXIT_FAILURE;
 
 	if (__verbose)
@@ -315,7 +321,7 @@ int main(int argc, char * const argv[])
 
 		if (parse_command(command, &nr_tokens, tokens) == 0)
 			goto more; /* You may use nested if-than-else, however .. */
-
+		//fprintf(stderr,"%d\n",getpid());
 		ret = run_command(nr_tokens, tokens);
 		if (ret == 0) {
 			break;

@@ -12,7 +12,8 @@ mpsh: pa1.o parser.o
 toy: toy.o
 	gcc $(LDFLAGS) $^ -o $@
 
-%.o: %.c
+%.o: %.
+
 	gcc $(CFLAGS) $< -o $@
 
 .PHONY: clean
@@ -40,6 +41,9 @@ test-for: $(TARGET) testcases/test-for
 test-prompt: $(TARGET) testcases/test-prompt
 	./$< < testcases/test-prompt
 
+.PHONY: test-run-veriy
+test-run-veriy: $(TARGET) testcases/test-run-veriy
+	./$< < testcases/test-run-veriy
 
 test-all: test-run test-timeout test-cd test-for test-prompt
 	echo
