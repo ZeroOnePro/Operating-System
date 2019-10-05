@@ -75,21 +75,39 @@ int main(int argc, const char* argv[]){
 }
 */
 
-int main(int argc, char* argv[]){
-    
-    int status;
-    pid_t pid;
+/* pipe() practice
 
-    if((pid=fork())==0){
-        if(execvp(argv[0],argv)<0){
-            fprintf(stderr,"No such file of directory\n");
-            abort();
-        }
-    }else{
-        waitpid(pid,&status,0);
+int main(){
+    int pipefd[2];
+    pid_t cpid;
+    char buf;
+
+    char talktochild[100] = "성민이의 2019년 운체 pipe 실습 ^^";
+    char* pointer = talktochild;
+
+    if(pipe(pipefd) == -1 ){
+        perror("pipe");
+        exit(EXIT_FAILURE);
     }
 
-    fprintf(stderr,"부모새끼\n");
+    cpid= fork();
+    if(cpid == 0){
+        close(pipefd[1]);
+        while(read(pipefd[0],&buf,1) > 0) // 반복문을 써서 문자하나하나 씩 read했다. 그래서 char buf 인데도 문자열 출력 가능했던거임
+        write(STDOUT_FILENO,&buf,1);
+
+        write(STDOUT_FILENO,"\n",1 );
+        close(pipefd[0]);
+        exit(EXIT_SUCCESS);
+    }else{
+       close(pipefd[0]);
+
+        write(pipefd[1],pointer,strlen(pointer));
+        close(pipefd[1]);
+        wait(NULL);
+        exit(EXIT_SUCCESS);
+    }
 
     return 0;
 }
+*/
