@@ -5,6 +5,7 @@
 #include <sys/types.h>
 #include <signal.h>
 #include <sys/wait.h>
+#include <pthread.h>
 
 /* pwd
 int main(int argc,char* argv[])
@@ -59,7 +60,7 @@ int main(int argc, const char* argv[]){
     pid_t pid;
     if((pid=fork())==0){
         sleep(20);
-        printf("sex\n");
+        printf("I wake!\n");
         exit(-1);
     }else{
         if(atoi(argv[1])==0){
@@ -111,3 +112,50 @@ int main(){
     return 0;
 }
 */
+
+/* pthread basic
+ int values[4] = {0,1,2,3};
+
+ void* hello(){
+     fprintf(stderr,"Hello, world\n");
+     fprintf(stderr,"%d\n",values[0]);
+     pthread_exit(0);
+ }
+
+ int main(){
+     pthread_t tid;
+
+     pthread_create(&tid,NULL,hello,NULL);
+     printf("%d\n",result);
+     printf("Hello world in main thread\n");
+     values[0]=100;
+    pthread_join(tid,NULL);
+     return 0;
+ }
+ */
+
+int sum;
+
+void * summer(void *param);
+
+int main(int argc,char* argv[]){
+    pthread_t tid;
+
+    pthread_create(&tid,NULL,summer,argv[1]);
+
+    pthread_join(tid,NULL);
+
+    printf("sum = %d\n",sum);
+
+    return 0;
+}
+
+void* summer(void* param){
+    int i;
+    int upper = atoi(param);
+    sum = 0;
+    for(i=0;i<=upper;i++){
+        sum +=i;
+    }
+    pthread_exit;
+}
