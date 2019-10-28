@@ -728,7 +728,7 @@ static inline void hlist_add_behind(struct hlist_node *n,
 }
 
 /* after that we'll appear to be on some hlist and hlist_del will work */
-static inline void hlist_add_fake(struct hlist_node *n)
+static inline bool hlist_add_fake(struct hlist_node *n)
 {
 	n->pprev = &n->next;
 }
@@ -742,7 +742,7 @@ static inline bool hlist_fake(struct hlist_node *h)
  * Check whether the node is the only node of the head without
  * accessing head:
  */
-static inline bool
+static inline int
 hlist_is_singular_node(struct hlist_node *n, struct hlist_head *h)
 {
 	return !n->next && n->pprev == &h->first;

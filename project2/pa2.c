@@ -185,7 +185,7 @@ pick_next:
 		 * If the ready queue is not empty, pick the first process
 		 * in the ready queue
 		 */
-		next = list_first_entry(&readyqueue, struct process, list);
+		next = list_first_entry(&readyqueue,struct process,list);
 
 		/**
 		 * Detach the process from the ready queue. Note we use list_del_init()
@@ -214,42 +214,140 @@ struct scheduler fifo_scheduler = {
  ***********************************************************************/
 static struct process *sjf_schedule(void)
 {
-	/**
-	 * Implement your own SJF scheduler here.
-	 */
-	return NULL;
+	struct process *next = NULL;
+	struct process *p = NULL; // 프로세스 가리키는 변수
+	struct process *sj = NULL; // Shortest job 으로 지명된 놈
+	struct process *tmp = NULL;
+
+	unsigned int __min_lifespan = 1000000; // 최대 값으로 설정하고
+
+	if (!current || current->status == PROCESS_WAIT) {
+		goto pick_next;
+	}
+
+	if (current->age < current->lifespan) {
+		return current;
+	}
+
+pick_next:
+
+	if (!list_empty(&readyqueue)) { // 웨이트 큐가 비지않았을 때
+		
+		// 리스트 순회하면서 lifespan이 제일 작은 놈을 찾아 볼것
+		list_for_each_entry_safe(p,tmp,&readyqueue,list){
+			if(__min_lifespan > p->lifespan){
+				__min_lifespan = p->lifespan;
+				sj = p;
+				//printf("pid : %d\n",p->pid);
+			}
+		}
+		next = sj; // 이놈이 shortest job 이니까 다음번 스케쥴 대상
+
+		list_del_init(&next->list); // 넥스트는 스케쥴 됫으니 레디큐에서 지운다.
+	}
+	
+	return next;
 }
 
 struct scheduler sjf_scheduler = {
 	.name = "Shortest-Job First",
 	.acquire = fcfs_acquire, /* Use the default FCFS acquire() */
 	.release = fcfs_release, /* Use the default FCFS release() */
-	.schedule = NULL,		 /* TODO: Assign sjf_schedule()
+	.schedule = sjf_schedule,	/* TODO: Assign sjf_schedule()
 								to this function pointer to activate
 								SJF in the system */
 };
 
 
 /***********************************************************************
- * SJF scheduler
+ * SRTF scheduler
  ***********************************************************************/
-struct scheduler srjf_scheduler = {
-	.name = "Shortest Remaining Job First",
+static struct process *srtf_schedule(void){
+
+	struct process *next = NULL;
+	struct process *p = NULL; // 프로세스 가리키는 변수
+	struct process *sj = NULL; // Shortest job 으로 지명된 놈
+	struct process *tmp = NULL;
+
+	unsigned int __min_lifespan = 1000000; // 최대 값으로 설정하고
+
+	if (!current || current->status == PROCESS_WAIT) {
+		goto pick_next;
+	}
+
+	if(current->age){
+		list_for_each_entry_safe(p,tmp,&readyqueue,list){
+			if(current->age > p->lifespan){ // remain > 새로온 놈lifespan
+				list_move_tail(&current->list,&readyqueue); // preemptive - 뺏겼으니까 다시 레디큐로 꺼지고
+				return p; // 새로온놈 스케쥴
+			}else{
+				return current; // 새로온 놈이 더 remain길면 하던거 그대로 하시고
+			}
+		}
+	}
+
+	// list_move_tail -> 한 리스트에서 삭제, 다른 리스트에 추가 list_move_tail(struct list_head* list, struct list_head *head)
+
+pick_next:
+	
+	if (!list_empty(&readyqueue)) { // 웨이트 큐가 비지않았을 때
+		
+		// 리스트 순회하면서 lifespan이 제일 작은 놈을 찾아 볼것
+		list_for_each_entry_safe(p,tmp,&readyqueue,list){
+			if(__min_lifespan > p->lifespan){
+				__min_lifespan = p->lifespan;
+				sj = p;
+			}
+		}
+		next = sj; // 이놈이 shortest job 이니까 다음번 스케쥴 대상
+
+		list_del_init(&next->list); // 넥스트는 스케쥴 됫으니 레디큐에서 지운다.
+	}
+	
+	return next;
+}
+
+struct scheduler srtf_scheduler = {
+	.name = "Shortest Remaining Time First",
 	.acquire = fcfs_acquire, /* Use the default FCFS acquire() */
 	.release = fcfs_release, /* Use the default FCFS release() */
-	/* You need to check the newly created processes to implement SRJF.
+	.forked = fork,
+	.schedule = srtf_schedule,
+	/* You need to check the newly created processes to implement SRTF.
 	 * Use @forked() callback to mark newly created processes */
-	/* Obviously, you should implement srjf_schedule() and attach it here */
+	/* Obviously, you should implement srtf_schedule() and attach it here */
 };
 
 
 /***********************************************************************
  * Round-robin scheduler
  ***********************************************************************/
+static struct process *rr_schedule(void){
+
+	struct process *next = NULL;
+	struct process *p = NULL; // 프로세스 가리키는 변수
+
+	if (!current || current->status == PROCESS_WAIT) {
+		goto pick_next;
+	}
+
+	if (current->age < current->lifespan) {
+		return current;
+	}
+
+pick_next:
+	
+	if (!list_empty(&readyqueue)) {
+		next = list_first_entry(&readyqueue,struct process,list);
+		
+	}
+}
+
 struct scheduler rr_scheduler = {
 	.name = "Round-Robin",
 	.acquire = fcfs_acquire, /* Use the default FCFS acquire() */
 	.release = fcfs_release, /* Use the default FCFS release() */
+	.schedule = rr_schedule,
 	/* Obviously, you should implement rr_schedule() and attach it here */
 };
 
