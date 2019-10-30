@@ -146,16 +146,21 @@ bool prio_acquire(int resource_id){
 
 	struct resource *r = resources + resource_id;
 	// this section no master for resource take it!
+	// 동시 도착, 동시에 같은 자원 가지려고 하면 먼저 들어온 놈 처리
+	// 프레임 워크에서는 안해주네
+	
+
 	if(!r->owner){
 		r->owner = current;
 		return true;
 	}
-
+	
 	// this section already resource is haved by ohter process
 	// you have to steel resource from low priority process
 
 	// owner already exist
 	// but i'm(current) have high priority rahter than owner
+	/*
 	if(current->prio > (r->owner)->prio){ // r->owner 한테 스케쥴 넘겨야 한다.
 		// pip 고려
 		// 상속 시켜야 된다.
@@ -163,10 +168,34 @@ bool prio_acquire(int resource_id){
 		(r->owner)->prio = current->prio; // 상속
 	}else if(current->prio == (r->owner)->prio){ // 같은 경우
 
-	}
+	}*/
+	
 	current->status = PROCESS_WAIT; // wait상태
 	list_add_tail(&current->list, &r->waitqueue); // waitqueue에 붙인다.
 	return false;
+}
+
+/***********************************************************************
+ * priority resource release function
+ * defualt fcfs acquire function + "prio value"  
+ * acquire 1 2 4 -> 1번 리소스를 들어온 시간+2 부터 4의 시간 동안 써야한다.
+ * write by seongminyoo
+ ***********************************************************************/
+void prio_release(int resource_id)
+{
+	struct resource *r = resources + resource_id;
+
+	r->owner = NULL;
+
+	if (!list_empty(&r->waitqueue)) {
+		struct process *waiter = list_first_entry(&r->waitqueue, struct process, list);
+
+		list_del_init(&waiter->list);
+
+		waiter->status = PROCESS_READY;
+
+		list_add_tail(&waiter->list, &readyqueue);
+	}
 }
  
 #include "sched.h"
@@ -385,10 +414,12 @@ struct scheduler rr_scheduler = {
  * Priority scheduler
  ***********************************************************************/
 static struct process *prio_schedule(void){
+
 	struct process *next = NULL;
 	struct process *p = NULL; // 프로세스 가리키는 변수
 	struct process *doduk = NULL; // Shortest job 으로 지명된 놈
 	struct process *tmp = NULL;
+	struct resource_schedule *rs;
 
 	int max_prio = -1; // 최소 값으로 설정하고
 
@@ -396,8 +427,9 @@ static struct process *prio_schedule(void){
 		goto pick_next;
 	}
 	
+	
 	if(current->age < current->lifespan){
-		list_move(&current->list,&readyqueue);
+		list_move_tail(&current->list,&readyqueue);
 	}
 
 pick_next:
@@ -419,8 +451,8 @@ pick_next:
 
 struct scheduler prio_scheduler = {
 	.name = "Priority",
-	.acquire = fcfs_acquire, /* Use the default FCFS acquire() */
-	.release = fcfs_release, /* Use the default FCFS release() */
+	.acquire = prio_acquire, /* Use the default FCFS acquire() */
+	.release = prio_release, /* Use the default FCFS release() */
 	.schedule = prio_schedule,
 };
 
