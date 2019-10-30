@@ -136,8 +136,39 @@ void fcfs_release(int resource_id)
 	}
 }
 
+/***********************************************************************
+ * Priority resource acquire function
+ * defualt fcfs acquire function + "prio value"  
+ * acquire 1 2 4 -> 1번 리소스를 들어온 시간+2 부터 4의 시간 동안 써야한다.
+ * write by seongminyoo
+ **********************************************************************/
+bool prio_acquire(int resource_id){
 
+	struct resource *r = resources + resource_id;
+	// this section no master for resource take it!
+	if(!r->owner){
+		r->owner = current;
+		return true;
+	}
 
+	// this section already resource is haved by ohter process
+	// you have to steel resource from low priority process
+
+	// owner already exist
+	// but i'm(current) have high priority rahter than owner
+	if(current->prio > (r->owner)->prio){ // r->owner 한테 스케쥴 넘겨야 한다.
+		// pip 고려
+		// 상속 시켜야 된다.
+		(r->owner)->prio_orig = (r->owner)->prio; // origin 에다 박고
+		(r->owner)->prio = current->prio; // 상속
+	}else if(current->prio == (r->owner)->prio){ // 같은 경우
+
+	}
+	current->status = PROCESS_WAIT; // wait상태
+	list_add_tail(&current->list, &r->waitqueue); // waitqueue에 붙인다.
+	return false;
+}
+ 
 #include "sched.h"
 
 /***********************************************************************
@@ -359,7 +390,7 @@ static struct process *prio_schedule(void){
 	struct process *doduk = NULL; // Shortest job 으로 지명된 놈
 	struct process *tmp = NULL;
 
-	unsigned int max_prio = 0; // 최소 값으로 설정하고
+	int max_prio = -1; // 최소 값으로 설정하고
 
 	if (!current || current->status == PROCESS_WAIT) {
 		goto pick_next;
@@ -374,8 +405,8 @@ pick_next:
 	if (!list_empty(&readyqueue)) { // 웨이트 큐가 비지 않았을 때
 		// 리스트 순회하면서 prio 제일 큰 놈
 		list_for_each_entry_safe(p,tmp,&readyqueue,list){
-			if(max_prio <= p->prio){
-				max_prio = p->prio;
+			if(max_prio < (int)(p->prio)){
+				max_prio = (int)(p->prio);
 				doduk = p;
 			}
 		}
