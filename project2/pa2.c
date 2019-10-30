@@ -353,13 +353,44 @@ struct scheduler rr_scheduler = {
 /***********************************************************************
  * Priority scheduler
  ***********************************************************************/
+static struct process *prio_schedule(void){
+	struct process *next = NULL;
+	struct process *p = NULL; // 프로세스 가리키는 변수
+	struct process *doduk = NULL; // Shortest job 으로 지명된 놈
+	struct process *tmp = NULL;
+
+	unsigned int max_prio = 0; // 최소 값으로 설정하고
+
+	if (!current || current->status == PROCESS_WAIT) {
+		goto pick_next;
+	}
+	
+	if(current->age < current->lifespan){
+		list_move(&current->list,&readyqueue);
+	}
+
+pick_next:
+
+	if (!list_empty(&readyqueue)) { // 웨이트 큐가 비지 않았을 때
+		// 리스트 순회하면서 prio 제일 큰 놈
+		list_for_each_entry_safe(p,tmp,&readyqueue,list){
+			if(max_prio <= p->prio){
+				max_prio = p->prio;
+				doduk = p;
+			}
+		}
+		next = doduk; // 이놈이 hightest prio 이니까 다음번 스케쥴 대상
+		list_del_init(&next->list); // 넥스트는 스케쥴 됫으니 레디큐에서 지운다.
+	}
+	
+	return next;
+}
+
 struct scheduler prio_scheduler = {
 	.name = "Priority",
-	/**
-	 * Implement your own acqure/release function to make priority
-	 * scheduler correct.
-	 */
-	/* Implement your own prio_schedule() and attach it here */
+	.acquire = fcfs_acquire, /* Use the default FCFS acquire() */
+	.release = fcfs_release, /* Use the default FCFS release() */
+	.schedule = prio_schedule,
 };
 
 
