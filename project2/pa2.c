@@ -52,6 +52,12 @@ extern unsigned int ticks;
  */
 extern bool quiet;
 
+/**
+ * For working PIP Protocol
+ */
+bool working = false;
+struct process * real = NULL;
+bool change = false;
 
 /***********************************************************************
  * Default FCFS resource acquision function
@@ -145,30 +151,25 @@ void fcfs_release(int resource_id)
 bool prio_acquire(int resource_id){
 
 	struct resource *r = resources + resource_id;
+
 	// this section no master for resource take it!
-	// 동시 도착, 동시에 같은 자원 가지려고 하면 먼저 들어온 놈 처리
-	// 프레임 워크에서는 안해주네
-	
 
 	if(!r->owner){
 		r->owner = current;
+		(r->owner)->prio_orig = (r->owner)->prio; // origin 에다 박고
 		return true;
 	}
+
 	
-	// this section already resource is haved by ohter process
-	// you have to steel resource from low priority process
-
-	// owner already exist
-	// but i'm(current) have high priority rahter than owner
-	/*
-	if(current->prio > (r->owner)->prio){ // r->owner 한테 스케쥴 넘겨야 한다.
-		// pip 고려
-		// 상속 시켜야 된다.
-		(r->owner)->prio_orig = (r->owner)->prio; // origin 에다 박고
-		(r->owner)->prio = current->prio; // 상속
-	}else if(current->prio == (r->owner)->prio){ // 같은 경우
-
-	}*/
+	if(working){ // pip !
+		if(current->prio > (r->owner)->prio){ 
+			// r -> owner 한테 스케쥴 넘겨야 한다.
+			// 상속 시켜야 된다.
+			(r->owner)->prio = current->prio; // 상속
+			real = current; // 얘가 자원을 놓으면 곧바로 스케쥴 되야 하므로
+			change = true; // 우선순위 변화됬다고 체크
+		}
+	}
 	
 	current->status = PROCESS_WAIT; // wait상태
 	list_add_tail(&current->list, &r->waitqueue); // waitqueue에 붙인다.
@@ -185,17 +186,24 @@ void prio_release(int resource_id)
 {
 	struct resource *r = resources + resource_id;
 
+	if(change){
+		// prio 원상복구
+		(r->owner)->prio = (r->owner)->prio_orig;
+	}
+
 	r->owner = NULL;
 
 	if (!list_empty(&r->waitqueue)) {
-		struct process *waiter = list_first_entry(&r->waitqueue, struct process, list);
-
-		list_del_init(&waiter->list);
-
-		waiter->status = PROCESS_READY;
-
-		list_add_tail(&waiter->list, &readyqueue);
+		struct process *cleaner = NULL;
+		struct process * tmp = NULL;
+		list_for_each_entry_safe(cleaner,tmp,&r->waitqueue,list){
+			list_del_init(&cleaner->list); // 웨이트 큐에서 삭제
+			cleaner->status = PROCESS_READY; // 레디 상태
+			list_add(&cleaner->list,&readyqueue); // 레디큐의 첫번 째로
+			list_del_init(&current->list); // 현재 스케쥴된거는 없애버리고
+		}
 	}
+
 }
  
 #include "sched.h"
@@ -298,7 +306,6 @@ pick_next:
 			if(__min_lifespan > p->lifespan){
 				__min_lifespan = p->lifespan;
 				sj = p;
-				//printf("pid : %d\n",p->pid);
 			}
 		}
 		next = sj; // 이놈이 shortest job 이니까 다음번 스케쥴 대상
@@ -419,14 +426,64 @@ static struct process *prio_schedule(void){
 	struct process *p = NULL; // 프로세스 가리키는 변수
 	struct process *doduk = NULL; // Shortest job 으로 지명된 놈
 	struct process *tmp = NULL;
-	struct resource_schedule *rs;
-
+	
 	int max_prio = -1; // 최소 값으로 설정하고
 
 	if (!current || current->status == PROCESS_WAIT) {
 		goto pick_next;
 	}
 	
+	
+	if(current->age < current->lifespan){
+		list_move_tail(&current->list,&readyqueue);
+	}
+
+pick_next:
+
+	if (!list_empty(&readyqueue)) { // 웨이트 큐가 비지 않았을 때
+
+	
+		// 리스트 순회하면서 prio 제일 큰 놈
+		list_for_each_entry_safe(p,tmp,&readyqueue,list){
+			if(max_prio < (int)(p->prio)){
+				max_prio = (int)(p->prio);
+				doduk = p;
+			}
+		}
+		next = doduk; // 이놈이 hightest prio 이니까 다음번 스케쥴 대상
+		
+		list_del_init(&next->list); // 넥스트는 스케쥴 됫으니 레디큐에서 지운다.
+	}
+	
+	return next;
+}
+
+struct scheduler prio_scheduler = {
+	.name = "Priority",
+	.acquire = prio_acquire, 
+	.release = prio_release,
+	.schedule = prio_schedule,
+};
+
+
+/***********************************************************************
+ * Priority scheduler with priority inheritance protocol
+ ***********************************************************************/
+static struct process *pip_schedule(void){
+
+	struct process *next = NULL;
+	struct process *p = NULL; // 프로세스 가리키는 변수
+	struct process *doduk = NULL; // Shortest job 으로 지명된 놈
+	struct process *tmp = NULL;
+	
+	working = true;
+
+	int max_prio = -1; // 최소 값으로 설정하고
+
+	if (!current || current->status == PROCESS_WAIT) {
+		goto pick_next;
+	}
+
 	
 	if(current->age < current->lifespan){
 		list_move_tail(&current->list,&readyqueue);
@@ -449,22 +506,9 @@ pick_next:
 	return next;
 }
 
-struct scheduler prio_scheduler = {
-	.name = "Priority",
-	.acquire = prio_acquire, /* Use the default FCFS acquire() */
-	.release = prio_release, /* Use the default FCFS release() */
-	.schedule = prio_schedule,
-};
-
-
-/***********************************************************************
- * Priority scheduler with priority inheritance protocol
- ***********************************************************************/
 struct scheduler pip_scheduler = {
 	.name = "Priority + Priority Inheritance Protocol",
-	/**
-	 * Implement your own acqure/release function too to make priority
-	 * scheduler correct.
-	 */
-	/* It goes without saying to implement your own pip_schedule() */
+	.acquire = prio_acquire, 
+	.release = prio_release,
+	.schedule = pip_schedule,
 };
