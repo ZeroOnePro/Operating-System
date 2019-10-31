@@ -56,7 +56,6 @@ extern bool quiet;
  * For working PIP Protocol
  */
 bool working = false;
-struct process * real = NULL;
 bool change = false;
 
 /***********************************************************************
@@ -166,7 +165,6 @@ bool prio_acquire(int resource_id){
 			// r -> owner 한테 스케쥴 넘겨야 한다.
 			// 상속 시켜야 된다.
 			(r->owner)->prio = current->prio; // 상속
-			real = current; // 얘가 자원을 놓으면 곧바로 스케쥴 되야 하므로
 			change = true; // 우선순위 변화됬다고 체크
 		}
 	}
