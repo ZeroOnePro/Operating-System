@@ -72,7 +72,7 @@ static bool __access_memory(enum memory_access_type rw, unsigned int vpn)
 	unsigned int pfn;
 	int ret;
 	int nr_retries = 0;
-
+	
 	assert(vpn >= 0);
 	/**
 	 * We have NR_PTES_PER_PAGE entries in the outer table and so do for
@@ -94,6 +94,7 @@ static bool __access_memory(enum memory_access_type rw, unsigned int vpn)
 		 * restart the translation if the fault is successfully handled.
 		 * Count the number of retries to prevent buggy translation.
 		 */
+	
 		nr_retries++;
 	} while ((ret = handle_page_fault(rw, vpn)) == true && nr_retries < 2);
 
@@ -221,6 +222,7 @@ int main(int argc, char * argv[])
 		printf("                                              - SCE213 2019.12 -\n");
 		printf("***************************************************************************\n");
 	}
+
 
 	if (argv[optind]) {
 		if (!quiet) printf("Use file \"%s\" as input\n", argv[optind]);

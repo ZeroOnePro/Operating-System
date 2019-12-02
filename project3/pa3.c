@@ -42,7 +42,7 @@ extern struct process *current;
  *   PFN of the newly allocated page frame.
  */
 extern unsigned int alloc_page(void);
-
+struct pte_directory pd[NR_PTES_PER_PAGE];
 
 
 /**
@@ -64,8 +64,18 @@ extern unsigned int alloc_page(void);
 bool translate(enum memory_access_type rw, unsigned int vpn, unsigned int *pfn)
 {
 	/*** DO NOT MODIFY THE PAGE TABLE IN THIS FUNCTION ***/
+	
+	int outer_index = vpn / 16;
+	int inner_index = vpn % 16;
 
-	return false;
+	if(!current->pagetable.outer_ptes[outer_index]){ // initial
+		 return false;
+	}else if(!current->pagetable.outer_ptes[outer_index]->ptes[inner_index].valid){ // inner page table valid = false
+		return false;
+	}else{
+		*pfn = current->pagetable.outer_ptes[outer_index]->ptes[inner_index].pfn;
+		return true;
+	}
 }
 
 
@@ -88,6 +98,27 @@ bool translate(enum memory_access_type rw, unsigned int vpn, unsigned int *pfn)
  */
 bool handle_page_fault(enum memory_access_type rw, unsigned int vpn)
 {
+	// 이미 할당된것이 없다는 것을 알고 왔으므로
+	// 새로 할당할 것
+	// pte->pfn에 저장해주면 끝
+	// vpn 0-255, outer_ptes 16, ptes 16
+	// make new pte
+	int outer_index = vpn / 16;
+	int inner_index = vpn % 16;
+
+	
+	// demand paging
+	// make new inner page table
+	if(!pd[outer_index].ptes[inner_index].valid){
+		 pd[outer_index].ptes[inner_index].pfn = alloc_page(); // if not vaild, alloc_page
+		 pd[outer_index].ptes[inner_index].writable = true; // writable bit = on
+		pd[outer_index].ptes[inner_index].valid = true; // if page allocate, this pte is valid..
+	}
+	
+	
+	// make new outer page table and MAP
+	current->pagetable.outer_ptes[outer_index] = &pd[outer_index];
+	
 	return true;
 }
 
@@ -106,7 +137,7 @@ bool handle_page_fault(enum memory_access_type rw, unsigned int vpn)
  *   page table. Also, should update the writable bit properly to implement
  *   the copy-on-write feature.
  */
-void switch_process(unsigned int pid)
+void switch_process(unsigned int pid) // context switch
 {
 }
 
