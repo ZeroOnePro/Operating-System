@@ -44,10 +44,7 @@ extern struct process *current;
 extern unsigned int alloc_page(void);
 struct pte_directory pd[NR_PTES_PER_PAGE];
 
-struct process forked ={
-			.pid = 0,
-			.pagetable = NULL,
-};
+struct process forked[4] ={{0,NULL},{0,NULL},{0,NULL},{0,NULL}};
 
 
 /**
@@ -161,17 +158,21 @@ void switch_process(unsigned int pid) // context switch
 	bool needfork = false;
 	struct process* p = NULL;
 
-	if(list_empty(&processes)){
+	bool init = true;
+
+	if(list_empty(&processes) && init){
 		list_add(&current->list,&processes);
+		init = false;
 	}
 
 
 	list_for_each_entry(p,&processes,list){
+		
 		if(p->pid == pid){ // already exist.. don't need to fork
-			
+		
 			current->pid = p->pid;
 			current->pagetable = p->pagetable;
-			return;
+	
 		}else{
 			needfork = true;
 		}
@@ -187,20 +188,23 @@ void switch_process(unsigned int pid) // context switch
 		struct pte_directory *pd = current->pagetable.outer_ptes[i];
 
 		if (!pd) continue;
-		
+
 		for (int j = 0; j < NR_PTES_PER_PAGE; j++) {
 			struct pte *pte = &pd->ptes[j];
 		 	pte->writable = false;
 		}
 	}
 
+	
 	//fork!!
-		struct process* new = &forked;
+		struct process* new = forked+pid;
 		new->pid = pid;
 		new -> pagetable = current->pagetable;
 		list_add(&new->list, &processes);
+		list_move(&current->list,&processes);
+		//context-switch
 		current = new;
+		return;
 	}
-	return;
 }
 
