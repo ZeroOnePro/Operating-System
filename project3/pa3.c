@@ -44,6 +44,11 @@ extern struct process *current;
 extern unsigned int alloc_page(void);
 struct pte_directory pd[NR_PTES_PER_PAGE];
 
+struct process forked ={
+			.pid = 0,
+			.pagetable = NULL,
+};
+
 
 /**
  * TODO translate()
@@ -139,5 +144,63 @@ bool handle_page_fault(enum memory_access_type rw, unsigned int vpn)
  */
 void switch_process(unsigned int pid) // context switch
 {
+	/*******************************
+	 * You may switch the currently running process with switch command. 
+	 * Enter the command followed by the process id to switch, and then, 
+	 * the framework will call switch_process() to handle the request. 
+	 * Find the target process from the processes list, and if exists, 
+	 * do the context switching by replacing @current with it.
+	 * If the target process does not exist, 
+	 * you need to fork a child process from @current. 
+	 * This implies you should allocate struct process for the child process 
+	 * and initialize it (including page table) accordingly. 
+	 * To duplicate the parent's address space, set up the PTE in 
+	 * the child's page table to map to the same PFN of the parent. 
+	 * You need to set up PTE property bits to support copy-on-write.
+	*/
+	bool needfork = false;
+	struct process* p = NULL;
+
+	if(list_empty(&processes)){
+		list_add(&current->list,&processes);
+	}
+
+
+	list_for_each_entry(p,&processes,list){
+		if(p->pid == pid){ // already exist.. don't need to fork
+			
+			current->pid = p->pid;
+			current->pagetable = p->pagetable;
+			return;
+		}else{
+			needfork = true;
+		}
+	}
+	
+	
+
+	// fork
+	if(needfork){
+		// write bit 끄기
+	for (int i = 0; i < NR_PTES_PER_PAGE; i++) {
+	
+		struct pte_directory *pd = current->pagetable.outer_ptes[i];
+
+		if (!pd) continue;
+		
+		for (int j = 0; j < NR_PTES_PER_PAGE; j++) {
+			struct pte *pte = &pd->ptes[j];
+		 	pte->writable = false;
+		}
+	}
+
+	//fork!!
+		struct process* new = &forked;
+		new->pid = pid;
+		new -> pagetable = current->pagetable;
+		list_add(&new->list, &processes);
+		current = new;
+	}
+	return;
 }
 
