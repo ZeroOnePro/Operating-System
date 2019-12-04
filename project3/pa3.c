@@ -50,6 +50,7 @@ extern unsigned int alloc_page(void);
 struct process* forked[5];
 struct pagetable pagetable[5];
 bool cow = false;
+
 /****************************************************************************/
 /**
  * TODO translate()
@@ -80,10 +81,9 @@ bool translate(enum memory_access_type rw, unsigned int vpn, unsigned int *pfn)
 		 return false;
 	}else if(!forked[current->pid]->pagetable.outer_ptes[outer_index]->ptes[inner_index].valid){ // inner page table valid = false
 		return false;
-	}else if(rw && cow && !forked[current->pid]->pagetable.outer_ptes[outer_index]->ptes[inner_index].writable){
+	}else if(rw && cow && !forked[current->pid]->pagetable.outer_ptes[outer_index]->ptes[inner_index].writable){ // cow
 		return false;
-	}
-	else{
+	}else{
 		*pfn = forked[current->pid]->pagetable.outer_ptes[outer_index]->ptes[inner_index].pfn;
 		return true;
 	}
@@ -151,28 +151,18 @@ bool handle_page_fault(enum memory_access_type rw, unsigned int vpn)
 		//memset(&pdp2,0,sizeof(struct pte_directory*));
 	}else if(!forked[current->pid]->pagetable.outer_ptes[outer_index]->ptes[inner_index].valid){
 		//printf("::not valid::\n");
-
+	
 		// outer랑 inner는 있으므로 pte와 연결한다.
 		forked[current->pid]->pagetable.outer_ptes[outer_index]->ptes[inner_index].pfn = alloc_page();
 		forked[current->pid]->pagetable.outer_ptes[outer_index]->ptes[inner_index].valid = true;
 		forked[current->pid]->pagetable.outer_ptes[outer_index]->ptes[inner_index].writable = true;
 	}else if(rw && cow && !forked[current->pid]->pagetable.outer_ptes[outer_index]->ptes[inner_index].writable){
-		
-		// p1 -p2 - p3 연결 되있음 
-
-		// 현재 write 하려는 PTE의 연결을 끊는다.
-		// 새로 할당 해야됨..
-		struct pte* newpte = malloc(sizeof(struct pte));
-		newpte -> pfn = alloc_page();
-		newpte -> writable = true;
-		newpte -> valid = true;
-		struct pte* oldpte = &forked[current->pid]->pagetable.outer_ptes[outer_index]->ptes[inner_index];
-		oldpte = newpte;
+		forked[current->pid]->pagetable.outer_ptes[outer_index]->ptes[inner_index].pfn = alloc_page();
+		forked[current->pid]->pagetable.outer_ptes[outer_index]->ptes[inner_index].valid = true;
+		forked[current->pid]->pagetable.outer_ptes[outer_index]->ptes[inner_index].writable = true;
 	}
 	// 생성한 pte와 current 의 inner page table의 pte를 맵
 	return true;
-
-	
 }
 
 
