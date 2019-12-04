@@ -215,8 +215,8 @@ void switch_process(unsigned int pid) // context switch
 		// new page table
 		// current's pagetable
 		// copy page table
-		struct pte_directory newpd[NR_PTES_PER_PAGE];
-		struct pte newpte[NR_PTES_PER_PAGE];
+		//struct pte_directory newpd[NR_PTES_PER_PAGE];
+		//struct pte newpte[NR_PTES_PER_PAGE];
 
 		for (int i = 0; i < NR_PTES_PER_PAGE; i++) {
 			
@@ -226,7 +226,7 @@ void switch_process(unsigned int pid) // context switch
 			
 			for (int j = 0; j < NR_PTES_PER_PAGE; j++){
 				
-				
+				struct pte newpte[NR_PTES_PER_PAGE];
 				newpte[j].pfn = oldpd->ptes[j].pfn;
 				newpte[j].valid = oldpd->ptes[j].valid;
 				newpte[j].writable = false;
@@ -236,7 +236,7 @@ void switch_process(unsigned int pid) // context switch
 				newpd[i].ptes[j].writable = newpte[j].writable;
 			}
 				struct pte_directory* pdp1 = &newpd[i];
-				struct pte_directory* pdp2 = malloc(sizeof(struct pte_directory*));
+				struct pte_directory* pdp2 = malloc(sizeof(struct pte_directory*)*NR_PTES_PER_PAGE);
 				memcpy(&pdp2,&pdp1,sizeof(struct pte_directory*));
 				// process와 연결 지어주고
 				pagetable[pid].outer_ptes[i] = pdp2;
@@ -270,4 +270,3 @@ void switch_process(unsigned int pid) // context switch
 end:
 	return;
 }
-
