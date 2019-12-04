@@ -16,6 +16,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <strings.h>
+#include <string.h>
+#include <stdlib.h>
 
 #include "types.h"
 #include "list_head.h"
@@ -42,11 +44,13 @@ extern struct process *current;
  *   PFN of the newly allocated page frame.
  */
 extern unsigned int alloc_page(void);
-struct pte_directory pd[NR_PTES_PER_PAGE];
 
-struct process forked[4] ={{0,NULL},{0,NULL},{0,NULL},{0,NULL}};
+// make process
 
+struct process* forked[100];
+struct pagetable pagetable[100];
 
+/****************************************************************************/
 /**
  * TODO translate()
  *
@@ -70,14 +74,17 @@ bool translate(enum memory_access_type rw, unsigned int vpn, unsigned int *pfn)
 	int outer_index = vpn / 16;
 	int inner_index = vpn % 16;
 
-	if(!current->pagetable.outer_ptes[outer_index]){ // initial
+	forked[current->pid] = current;
+	
+	if(!forked[current->pid]->pagetable.outer_ptes[outer_index]){ // initial
 		 return false;
-	}else if(!current->pagetable.outer_ptes[outer_index]->ptes[inner_index].valid){ // inner page table valid = false
+	}else if(!forked[current->pid]->pagetable.outer_ptes[outer_index]->ptes[inner_index].valid){ // inner page table valid = false
 		return false;
 	}else{
-		*pfn = current->pagetable.outer_ptes[outer_index]->ptes[inner_index].pfn;
+		*pfn = forked[current->pid]->pagetable.outer_ptes[outer_index]->ptes[inner_index].pfn;
 		return true;
 	}
+
 }
 
 
@@ -108,19 +115,46 @@ bool handle_page_fault(enum memory_access_type rw, unsigned int vpn)
 	int outer_index = vpn / 16;
 	int inner_index = vpn % 16;
 
+	// make first page table
 	
-	// demand paging
-	// make new inner page table
-	if(!pd[outer_index].ptes[inner_index].valid){
-		 pd[outer_index].ptes[inner_index].pfn = alloc_page(); // if not vaild, alloc_page
-		 pd[outer_index].ptes[inner_index].writable = true; // writable bit = on
-		pd[outer_index].ptes[inner_index].valid = true; // if page allocate, this pte is valid..
+	// init inner pagetable
+
+	forked[current->pid] = current;
+	// p0
+	if(!forked[current->pid]->pagetable.outer_ptes[outer_index]){
+		//printf("::no outer::\n");
+		struct pte_directory pd[NR_PTES_PER_PAGE*10];
+		
+		struct pte p[NR_PTES_PER_PAGE*10];
+		
+		// pte에 pfn값 할당
+		p[inner_index].pfn = alloc_page();
+		// pte의 valid bit 변경
+		p[inner_index].valid = true;
+		// pte의 writable 변경
+		p[inner_index].writable = true;
+		// inner page table 로 집어넣고
+		pd[outer_index].ptes[inner_index].pfn = p[inner_index].pfn;
+		pd[outer_index].ptes[inner_index].valid = p[inner_index].valid;
+		pd[outer_index].ptes[inner_index].writable = p[inner_index].writable;
+		// outer page table 로 집어넣고
+		struct pte_directory* pdp1 = &pd[outer_index];
+		struct pte_directory* pdp2 = malloc(sizeof(struct pte_directory*));
+		memcpy(&pdp2,&pdp1,sizeof(struct pte_directory*));
+		// process와 연결 지어주고
+		pagetable[current->pid].outer_ptes[outer_index] = pdp2;
+		forked[current->pid]->pagetable = pagetable[current->pid];
+		//memset(&pdp1,0,sizeof(struct pte_directory*));
+		//memset(&pdp2,0,sizeof(struct pte_directory*));
+	}else if(!forked[current->pid]->pagetable.outer_ptes[outer_index]->ptes[inner_index].valid){
+		//printf("::not valid::\n");
+	
+		// outer랑 inner는 있으므로 pte와 연결한다.
+		forked[current->pid]->pagetable.outer_ptes[outer_index]->ptes[inner_index].pfn = alloc_page();
+		forked[current->pid]->pagetable.outer_ptes[outer_index]->ptes[inner_index].valid = true;
+		forked[current->pid]->pagetable.outer_ptes[outer_index]->ptes[inner_index].writable = true;
 	}
-	
-	
-	// make new outer page table and MAP
-	current->pagetable.outer_ptes[outer_index] = &pd[outer_index];
-	
+	// 생성한 pte와 current 의 inner page table의 pte를 맵
 	return true;
 }
 
@@ -139,23 +173,12 @@ bool handle_page_fault(enum memory_access_type rw, unsigned int vpn)
  *   page table. Also, should update the writable bit properly to implement
  *   the copy-on-write feature.
  */
+
+bool isforked[4] = {true, false, false, false};
+
 void switch_process(unsigned int pid) // context switch
 {
-	/*******************************
-	 * You may switch the currently running process with switch command. 
-	 * Enter the command followed by the process id to switch, and then, 
-	 * the framework will call switch_process() to handle the request. 
-	 * Find the target process from the processes list, and if exists, 
-	 * do the context switching by replacing @current with it.
-	 * If the target process does not exist, 
-	 * you need to fork a child process from @current. 
-	 * This implies you should allocate struct process for the child process 
-	 * and initialize it (including page table) accordingly. 
-	 * To duplicate the parent's address space, set up the PTE in 
-	 * the child's page table to map to the same PFN of the parent. 
-	 * You need to set up PTE property bits to support copy-on-write.
-	*/
-	bool needfork = false;
+	// init process list에 추가
 	struct process* p = NULL;
 
 	bool init = true;
@@ -165,46 +188,36 @@ void switch_process(unsigned int pid) // context switch
 		init = false;
 	}
 
-
-	list_for_each_entry(p,&processes,list){
-		
-		if(p->pid == pid){ // already exist.. don't need to fork
-		
-			current->pid = p->pid;
-			current->pagetable = p->pagetable;
+	// case1 : fork 해야하는 경우
+	// 처음 온 프로세스 플래그
 	
-		}else{
-			needfork = true;
+
+	if(!isforked[pid]){
+		// fork 됬음으로 바꿈
+		isforked[pid] = true;
+		// current 의 writable bit를 끈다.
+		for (int i = 0; i < NR_PTES_PER_PAGE; i++) {
+	
+			struct pte_directory *pd = current->pagetable.outer_ptes[i];
+
+			if (!pd) continue;
+
+			for (int j = 0; j < NR_PTES_PER_PAGE; j++) {
+				struct pte *pte = &pd->ptes[j];
+		 		pte->writable = false;
+			}
 		}
-	}
-	
-	
+		// fork -> pid change, make new pagetable and copy current's pagetable
+		
+		struct process * new = malloc(sizeof(struct process *)); 
 
-	// fork
-	if(needfork){
-		// write bit 끄기
-	for (int i = 0; i < NR_PTES_PER_PAGE; i++) {
-	
-		struct pte_directory *pd = current->pagetable.outer_ptes[i];
+		struct pte_directory pd[NR_PTES_PER_PAGE*10];
+		
+		struct pte p[NR_PTES_PER_PAGE*10];
 
-		if (!pd) continue;
-
-		for (int j = 0; j < NR_PTES_PER_PAGE; j++) {
-			struct pte *pte = &pd->ptes[j];
-		 	pte->writable = false;
-		}
+		
 	}
 
-	
-	//fork!!
-		struct process* new = forked+pid;
-		new->pid = pid;
-		new -> pagetable = current->pagetable;
-		list_add(&new->list, &processes);
-		list_move(&current->list,&processes);
-		//context-switch
-		current = new;
-		return;
-	}
+	// case2 : list 뒤져서 바꿔주기만 하면 되는 경우
 }
 
