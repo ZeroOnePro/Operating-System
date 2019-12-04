@@ -47,8 +47,8 @@ extern unsigned int alloc_page(void);
 
 // make process
 
-struct process* forked[100];
-struct pagetable pagetable[100];
+struct process* forked[5];
+struct pagetable pagetable[5];
 
 /****************************************************************************/
 /**
@@ -182,7 +182,7 @@ void switch_process(unsigned int pid) // context switch
 	struct process* p = NULL;
 
 	bool init = true;
-
+	
 	if(list_empty(&processes) && init){
 		list_add(&current->list,&processes);
 		init = false;
@@ -191,11 +191,13 @@ void switch_process(unsigned int pid) // context switch
 	// case1 : fork 해야하는 경우
 	// 처음 온 프로세스 플래그
 	
-
 	if(!isforked[pid]){
 		// fork 됬음으로 바꿈
 		isforked[pid] = true;
+		struct process* new = (struct process *)malloc(sizeof(struct process*));
+		
 		// current 의 writable bit를 끈다.
+
 		for (int i = 0; i < NR_PTES_PER_PAGE; i++) {
 	
 			struct pte_directory *pd = current->pagetable.outer_ptes[i];
@@ -207,17 +209,65 @@ void switch_process(unsigned int pid) // context switch
 		 		pte->writable = false;
 			}
 		}
+		
 		// fork -> pid change, make new pagetable and copy current's pagetable
 		
-		struct process * new = malloc(sizeof(struct process *)); 
+		// new page table
+		// current's pagetable
+		// copy page table
+		struct pte_directory newpd[NR_PTES_PER_PAGE];
+		struct pte newpte[NR_PTES_PER_PAGE];
 
-		struct pte_directory pd[NR_PTES_PER_PAGE*10];
-		
-		struct pte p[NR_PTES_PER_PAGE*10];
+		for (int i = 0; i < NR_PTES_PER_PAGE; i++) {
+			
+			struct pte_directory *oldpd = current->pagetable.outer_ptes[i];
+			if (!oldpd) continue;
+			struct pte_directory newpd[NR_PTES_PER_PAGE];
+			
+			for (int j = 0; j < NR_PTES_PER_PAGE; j++){
+				
+				
+				newpte[j].pfn = oldpd->ptes[j].pfn;
+				newpte[j].valid = oldpd->ptes[j].valid;
+				newpte[j].writable = false;
+				
+				newpd[i].ptes[j].pfn = newpte[j].pfn;
+				newpd[i].ptes[j].valid = newpte[j].valid;
+				newpd[i].ptes[j].writable = newpte[j].writable;
+			}
+				struct pte_directory* pdp1 = &newpd[i];
+				struct pte_directory* pdp2 = malloc(sizeof(struct pte_directory*));
+				memcpy(&pdp2,&pdp1,sizeof(struct pte_directory*));
+				// process와 연결 지어주고
+				pagetable[pid].outer_ptes[i] = pdp2;
+				
+		}
 
-		
+		new->pagetable = pagetable[pid];
+
+		// map coppied pagetable
+		new->pid = pid;
+		// pid change
+		forked[pid] = new;
+		forked[pid]->pid = new->pid;
+		forked[pid]->pagetable = new->pagetable;
+		// add new process in list
+		list_add(&new->list,&processes);
+
+		// context switch
+		current = new;
+
+		return;
 	}
 
 	// case2 : list 뒤져서 바꿔주기만 하면 되는 경우
+	list_for_each_entry(p,&processes,list){
+		if(p->pid == pid){
+			current = p;
+			goto end;
+		}
+	}
+end:
+	return;
 }
 
