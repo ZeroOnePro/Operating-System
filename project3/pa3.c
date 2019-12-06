@@ -48,7 +48,8 @@ extern unsigned int alloc_page(void);
 // make process
 
 struct process* forked[5];
-struct pagetable pagetable[5];
+
+struct process pros[4];
 bool cow = false;
 
 /****************************************************************************/
@@ -74,17 +75,15 @@ bool translate(enum memory_access_type rw, unsigned int vpn, unsigned int *pfn)
 	
 	int outer_index = vpn / 16;
 	int inner_index = vpn % 16;
-
-	forked[current->pid] = current;
 	
-	if(!forked[current->pid]->pagetable.outer_ptes[outer_index]){ // initial
+	if(!pros[current->pid].pagetable.outer_ptes[outer_index]){ // initial
 		 return false;
-	}else if(!forked[current->pid]->pagetable.outer_ptes[outer_index]->ptes[inner_index].valid){ // inner page table valid = false
+	}else if(!pros[current->pid].pagetable.outer_ptes[outer_index]->ptes[inner_index].valid){ // inner page table valid = false
 		return false;
-	}else if(rw && cow && !forked[current->pid]->pagetable.outer_ptes[outer_index]->ptes[inner_index].writable){ // cow
+	}else if(rw && cow && !pros[current->pid].pagetable.outer_ptes[outer_index]->ptes[inner_index].writable){ // cow
 		return false;
 	}else{
-		*pfn = forked[current->pid]->pagetable.outer_ptes[outer_index]->ptes[inner_index].pfn;
+		*pfn = pros[current->pid].pagetable.outer_ptes[outer_index]->ptes[inner_index].pfn;
 		return true;
 	}
 
@@ -122,44 +121,25 @@ bool handle_page_fault(enum memory_access_type rw, unsigned int vpn)
 	
 	// init inner pagetable
 
-	forked[current->pid] = current;
-	// p0
-	if(!forked[current->pid]->pagetable.outer_ptes[outer_index]){
-		//printf("::no outer::\n");
-		struct pte_directory pd[NR_PTES_PER_PAGE*10];
-		
-		struct pte p[NR_PTES_PER_PAGE*10];
-		
-		// pte에 pfn값 할당
-		p[inner_index].pfn = alloc_page();
-		// pte의 valid bit 변경
-		p[inner_index].valid = true;
-		// pte의 writable 변경
-		p[inner_index].writable = true;
-		// inner page table 로 집어넣고
-		pd[outer_index].ptes[inner_index].pfn = p[inner_index].pfn;
-		pd[outer_index].ptes[inner_index].valid = p[inner_index].valid;
-		pd[outer_index].ptes[inner_index].writable = p[inner_index].writable;
-		// outer page table 로 집어넣고
-		struct pte_directory* pdp1 = &pd[outer_index];
-		struct pte_directory* pdp2 = malloc(sizeof(struct pte_directory*));
-		memcpy(&pdp2,&pdp1,sizeof(struct pte_directory*));
-		// process와 연결 지어주고
-		pagetable[current->pid].outer_ptes[outer_index] = pdp2;
-		forked[current->pid]->pagetable = pagetable[current->pid];
-		//memset(&pdp1,0,sizeof(struct pte_directory*));
-		//memset(&pdp2,0,sizeof(struct pte_directory*));
-	}else if(!forked[current->pid]->pagetable.outer_ptes[outer_index]->ptes[inner_index].valid){
+	if(!pros[current->pid].pagetable.outer_ptes[outer_index]){
+		struct process* prosp = &pros[current->pid];
+		prosp->pagetable.outer_ptes[outer_index] = malloc(sizeof(struct pte_directory));
+		prosp->pagetable.outer_ptes[outer_index]->ptes[inner_index].pfn = alloc_page();
+		prosp->pagetable.outer_ptes[outer_index]->ptes[inner_index].valid = true;
+		prosp->pagetable.outer_ptes[outer_index]->ptes[inner_index].writable = true;
+		current = &pros[current->pid];
+	}else if(!pros[current->pid].pagetable.outer_ptes[outer_index]->ptes[inner_index].valid){
 		//printf("::not valid::\n");
-	
 		// outer랑 inner는 있으므로 pte와 연결한다.
-		forked[current->pid]->pagetable.outer_ptes[outer_index]->ptes[inner_index].pfn = alloc_page();
-		forked[current->pid]->pagetable.outer_ptes[outer_index]->ptes[inner_index].valid = true;
-		forked[current->pid]->pagetable.outer_ptes[outer_index]->ptes[inner_index].writable = true;
-	}else if(rw && cow && !forked[current->pid]->pagetable.outer_ptes[outer_index]->ptes[inner_index].writable){
-		forked[current->pid]->pagetable.outer_ptes[outer_index]->ptes[inner_index].pfn = alloc_page();
-		forked[current->pid]->pagetable.outer_ptes[outer_index]->ptes[inner_index].valid = true;
-		forked[current->pid]->pagetable.outer_ptes[outer_index]->ptes[inner_index].writable = true;
+		pros[current->pid].pagetable.outer_ptes[outer_index]->ptes[inner_index].pfn = alloc_page();
+		pros[current->pid].pagetable.outer_ptes[outer_index]->ptes[inner_index].valid = true;
+		pros[current->pid].pagetable.outer_ptes[outer_index]->ptes[inner_index].writable = true;
+
+	}else if(rw && cow && !pros[current->pid].pagetable.outer_ptes[outer_index]->ptes[inner_index].writable){
+
+		pros[current->pid].pagetable.outer_ptes[outer_index]->ptes[inner_index].pfn = alloc_page();
+		pros[current->pid].pagetable.outer_ptes[outer_index]->ptes[inner_index].valid = true;
+		pros[current->pid].pagetable.outer_ptes[outer_index]->ptes[inner_index].writable = true;
 	}
 	// 생성한 pte와 current 의 inner page table의 pte를 맵
 	return true;
@@ -201,7 +181,6 @@ void switch_process(unsigned int pid) // context switch
 	if(!isforked[pid]){
 		// fork 됬음으로 바꿈
 		isforked[pid] = true;
-		struct process* new = (struct process *)malloc(sizeof(struct process*));
 		
 		// current 의 writable bit를 끈다.
 
@@ -222,47 +201,29 @@ void switch_process(unsigned int pid) // context switch
 		// new page table
 		// current's pagetable
 		// copy page table
-		//struct pte_directory newpd[NR_PTES_PER_PAGE];
-		//struct pte newpte[NR_PTES_PER_PAGE];
+		
+		struct process* prosp = &pros[pid];
+
+		prosp->pid = pid;
 
 		for (int i = 0; i < NR_PTES_PER_PAGE; i++) {
 			
 			struct pte_directory *oldpd = current->pagetable.outer_ptes[i];
 			if (!oldpd) continue;
-			struct pte_directory newpd[NR_PTES_PER_PAGE];
-			
+			prosp->pagetable.outer_ptes[i] = malloc(sizeof(struct pte_directory));
 			for (int j = 0; j < NR_PTES_PER_PAGE; j++){
-				
-				struct pte newpte[NR_PTES_PER_PAGE];
-				newpte[j].pfn = oldpd->ptes[j].pfn;
-				newpte[j].valid = oldpd->ptes[j].valid;
-				newpte[j].writable = false;
-				
-				newpd[i].ptes[j].pfn = newpte[j].pfn;
-				newpd[i].ptes[j].valid = newpte[j].valid;
-				newpd[i].ptes[j].writable = newpte[j].writable;
+				prosp->pagetable.outer_ptes[i]->ptes[j].pfn = oldpd->ptes[j].pfn;
+				prosp->pagetable.outer_ptes[i]->ptes[j].valid = oldpd->ptes[j].valid;
+				prosp->pagetable.outer_ptes[i]->ptes[j].writable = oldpd->ptes[j].writable;
 			}
-				struct pte_directory* pdp1 = &newpd[i];
-				struct pte_directory* pdp2 = malloc(sizeof(struct pte_directory*)*NR_PTES_PER_PAGE);
-				memcpy(&pdp2,&pdp1,sizeof(struct pte_directory*));
-				// process와 연결 지어주고
-				pagetable[pid].outer_ptes[i] = pdp2;
-				
 		}
-
-		new->pagetable = pagetable[pid];
-
-		// map coppied pagetable
-		new->pid = pid;
-		// pid change
-		forked[pid] = new;
-		forked[pid]->pid = new->pid;
-		forked[pid]->pagetable = new->pagetable;
+		
 		// add new process in list
-		list_add(&new->list,&processes);
+
+		list_add(&prosp->list,&processes);
 
 		// context switch
-		current = new;
+		current = &pros[pid];
 
 		return;
 	}
