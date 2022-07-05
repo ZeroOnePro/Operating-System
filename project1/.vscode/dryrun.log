@@ -1,0 +1,9 @@
+make --dry-run --always-make --keep-going --print-directory
+make: Entering directory `/Users/sungminyou/Workspace/personal/Operating-System/project1'
+cc -g -c -D_POSIX_C_SOURCE -std=c99 -Wimplicit-function-declaration -Werror    -c -o pa1.o pa1.c
+cc -g -c -D_POSIX_C_SOURCE -std=c99 -Wimplicit-function-declaration -Werror    -c -o parser.o parser.c
+gcc  pa1.o parser.o -o mpsh
+cc -g -c -D_POSIX_C_SOURCE -std=c99 -Wimplicit-function-declaration -Werror    -c -o toy.o toy.c
+gcc  toy.o -o toy
+make: Leaving directory `/Users/sungminyou/Workspace/personal/Operating-System/project1'
+ 

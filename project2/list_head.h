@@ -731,6 +731,7 @@ static inline void hlist_add_behind(struct hlist_node *n,
 static inline bool hlist_add_fake(struct hlist_node *n)
 {
 	n->pprev = &n->next;
+  return true;
 }
 
 static inline bool hlist_fake(struct hlist_node *h)

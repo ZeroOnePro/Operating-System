@@ -135,7 +135,7 @@ static int run_command(int nr_tokens, char *tokens[])
 				동적인 값들의 모임
 			*/
 		}
-	}else if(strncmp(tokens[0],"for",strlen("for"))==0){
+	}else if(strncmp(tokens[0],"for",(size_t)strlen("for"))==0){
 		/* information -
 		for 명령어 실행 코드
 			algorithm ->
@@ -153,7 +153,7 @@ static int run_command(int nr_tokens, char *tokens[])
 			if(atoi(tokens[index]) != 0){ // loop count code
 				loop *= atoi(tokens[index]);
 			}else{ // not number
-				if(strncmp(tokens[index],"for",strlen("for") != 0)){ // not for
+				if(strncmp(tokens[index],"for",strlen("for")) != 0){ // not for
 					command[t++] = tokens[index]; // command array에 실행시킬 명령어를 담아둔다.
 				}
 			}

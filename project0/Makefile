@@ -4,7 +4,7 @@ all: pa0
 
 CC = gcc
 
-OBJECT = pa0.o
+OBJECTS = pa0
 
 C = pa0.c
 

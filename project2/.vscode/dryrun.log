@@ -1,0 +1,8 @@
+make --dry-run --always-make --keep-going --print-directory
+make: Entering directory `/Users/sungminyou/Workspace/personal/Operating-System/project2'
+gcc -g -c -D_POSIX_C_SOURCE -Iinclude -std=c99 -Wimplicit-function-declaration -Werror  pa2.c -o pa2.o
+gcc -g -c -D_POSIX_C_SOURCE -Iinclude -std=c99 -Wimplicit-function-declaration -Werror  parser.c -o parser.o
+gcc -g -c -D_POSIX_C_SOURCE -Iinclude -std=c99 -Wimplicit-function-declaration -Werror  sched.c -o sched.o
+gcc  pa2.o parser.o sched.o -o sched
+make: Leaving directory `/Users/sungminyou/Workspace/personal/Operating-System/project2'
+ 
